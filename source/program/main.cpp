@@ -1,39 +1,36 @@
 #include "lib.hpp"
 
-/* Define hook StubCopyright. Trampoline indicates the original function should be kept. */
-/* HOOK_DEFINE_REPLACE can be used if the original function does not need to be kept. */
-HOOK_DEFINE_TRAMPOLINE(StubCopyright) {
-
-    /* Define the callback for when the function is called. Don't forget to make it static and name it Callback. */
-    static void Callback(bool enabled) {
-
-        /* Call the original function, with the argument always being false. */
-        Orig(false);
-    }
-
-};
-
-
-/* Declare function to dynamic link with. */
-namespace nn::oe {
-    void SetCopyrightVisibility(bool);
-};
+#include "nn/util/util_snprintf.hpp"
+#include "nn.hpp"
+#include "simpleio.h"
+#include "utils.hpp"
+#include "config.hpp"
+#include "hooks.hpp"
+#include "binaryoffsethelper.h"
 
 extern "C" void exl_main(void* x0, void* x1) {
-    /* Setup hooking enviroment. */
+
+    char buf[500];
+
+    /* Setup hooking enviroment */
     exl::hook::Initialize();
 
-    /* Install the hook at the provided function pointer. Function type is checked against the callback function. */
-    StubCopyright::InstallAtFuncPtr(nn::oe::SetCopyrightVisibility);
+    PRINT("Getting app version...");
+    int version = InitializeAppVersion();
+    if (version == 0xffffffff || version > 5) {
+        PRINT("Error getting version");
+        return;
+    }
+    PRINT("Version index %d", version);
 
-    /* Alternative install funcs: */
-    /* InstallAtPtr takes an absolute address as a uintptr_t. */
-    /* InstallAtOffset takes an offset into the main module. */
+    PRINT("Hooking functions...");
+    Add::InstallAtOffset(s_addhook[version]);
+    Remove::InstallAtOffset(s_removehook[version]);
+    PRINT("Hook successful");
+    
+    PRINT("Disclaimer: CameraXLinkControl being added to either PlayerCamera or EventCamera will be ignored to avoid spam");
 
-    /*
-    For sysmodules/applets, you have to call the entrypoint when ready
-    exl::hook::CallTargetEntrypoint(x0, x1);
-    */
+    return;
 }
 
 extern "C" NORETURN void exl_exception_entry() {
